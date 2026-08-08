@@ -238,6 +238,123 @@ function renderDashboard(data) {
   `;
 }
 
+function attachActionButtons(container, selector, handler) {
+  const buttons = container.querySelectorAll(selector);
+  buttons.forEach(button => {
+    button.addEventListener('click', () => handler(button.dataset.id));
+  });
+}
+
+async function postJson(url, payload) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Request failed');
+  }
+  return response.json();
+}
+
+async function createStation() {
+  const name = prompt('Station name:');
+  if (!name) return;
+  const location = prompt('Location:') || '';
+  const commander = prompt('Station commander:') || '';
+  const officers = prompt('Officers (comma separated):') || '';
+  const status = prompt('Status (active/maintenance):', 'active') || 'active';
+
+  await postJson('/api/stations', {
+    name,
+    location,
+    commander,
+    officers: officers.split(',').map(o => o.trim()).filter(Boolean),
+    status
+  });
+  await loadAllData();
+  alert('Station created successfully.');
+}
+
+async function createTask() {
+  const title = prompt('Task title:');
+  if (!title) return;
+  const assignedStationId = prompt('Assigned station ID:');
+  const assignedOfficers = prompt('Assigned officers (comma separated):') || '';
+  const status = prompt('Status (pending/in-progress/assigned/completed/delayed):', 'pending') || 'pending';
+  const deadline = prompt('Deadline (YYYY-MM-DD):', '') || null;
+  const priority = prompt('Priority (Low/Medium/High):', 'Medium') || 'Medium';
+  const conditions = prompt('Conditions or notes:') || '';
+
+  await postJson('/api/tasks', {
+    title,
+    assigned_station_id: assignedStationId ? Number(assignedStationId) : null,
+    assigned_officers: assignedOfficers.split(',').map(o => o.trim()).filter(Boolean),
+    status,
+    deadline,
+    priority,
+    conditions
+  });
+  await loadAllData();
+  alert('Task created successfully.');
+}
+
+async function createIncident() {
+  const type = prompt('Incident type:');
+  if (!type) return;
+  const location = prompt('Location:') || '';
+  const date = prompt('Date (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
+  const officers = prompt('Officers involved (comma separated):') || '';
+  const vehicles = prompt('Vehicles involved (comma separated):') || '';
+  const equipment = prompt('Equipment used (comma separated):') || '';
+  const report = prompt('Report summary:') || '';
+
+  await postJson('/api/incidents', {
+    type,
+    location,
+    date,
+    officers: officers.split(',').map(o => o.trim()).filter(Boolean),
+    vehicles: vehicles.split(',').map(v => v.trim()).filter(Boolean),
+    equipment: equipment.split(',').map(e => e.trim()).filter(Boolean),
+    media: [],
+    report
+  });
+  await loadAllData();
+  alert('Incident recorded successfully.');
+}
+
+async function createVehicle() {
+  const plate = prompt('Vehicle plate number:');
+  if (!plate) return;
+  const chassis = prompt('Chassis number:') || '';
+  const engine = prompt('Engine number:') || '';
+  const model = prompt('Model:') || '';
+  const capacity = prompt('Capacity:') || '';
+  const fuel = prompt('Fuel type:') || '';
+  const insurance = prompt('Insurance expiry:') || '';
+  const status = prompt('Status (active/maintenance):', 'active') || 'active';
+  const stationId = prompt('Station ID:');
+
+  await postJson('/api/vehicles', {
+    plate,
+    chassis,
+    engine,
+    model,
+    capacity,
+    fuel,
+    insurance,
+    status,
+    station_id: stationId ? Number(stationId) : null
+  });
+  await loadAllData();
+  alert('Vehicle registered successfully.');
+}
+
+function showDetails(title, details) {
+  alert(`${title}\n\n${details}`);
+}
+
 function renderStations(data) {
   const rows = data.map(station => [
     station.name,
@@ -245,10 +362,16 @@ function renderStations(data) {
     station.commander,
     station.officers.join(', '),
     station.status,
-    `<button class="primary">View</button>`
+    `<button class="primary action-btn" data-action="view-station" data-id="${station.id}">View</button>`
   ]);
   stationsList.innerHTML = '';
-  stationsList.appendChild(createTable(['Station Name', 'Location', 'Commander', 'Officers', 'Status', 'Actions'], rows));
+  const table = createTable(['Station Name', 'Location', 'Commander', 'Officers', 'Status', 'Actions'], rows);
+  stationsList.appendChild(table);
+  attachActionButtons(stationsList, '.action-btn[data-action="view-station"]', async (id) => {
+    const station = data.find(item => item.id === Number(id));
+    if (!station) return;
+    showDetails('Station Details', `Name: ${station.name}\nLocation: ${station.location}\nCommander: ${station.commander}\nOfficers: ${station.officers.join(', ')}\nStatus: ${station.status}`);
+  });
 }
 
 function renderTasks(data) {
@@ -258,10 +381,17 @@ function renderTasks(data) {
     task.assigned_officers.join(', '),
     task.status,
     task.deadline,
-    task.priority
+    task.priority,
+    `<button class="primary action-btn" data-action="view-task" data-id="${task.id}">View</button>`
   ]);
   tasksList.innerHTML = '';
-  tasksList.appendChild(createTable(['Task Title', 'Assigned Station', 'Assigned To', 'Status', 'Deadline', 'Priority'], rows));
+  const table = createTable(['Task Title', 'Assigned Station', 'Assigned To', 'Status', 'Deadline', 'Priority', 'Actions'], rows);
+  tasksList.appendChild(table);
+  attachActionButtons(tasksList, '.action-btn[data-action="view-task"]', async (id) => {
+    const task = data.find(item => item.id === Number(id));
+    if (!task) return;
+    showDetails('Task Details', `Title: ${task.title}\nStation: ${task.assignedStation}\nAssigned Officers: ${task.assigned_officers.join(', ')}\nStatus: ${task.status}\nDeadline: ${task.deadline}\nPriority: ${task.priority}\nConditions: ${task.conditions}`);
+  });
 }
 
 function renderIncidents(data) {
@@ -271,10 +401,17 @@ function renderIncidents(data) {
     item.date,
     item.officers.join(', '),
     item.vehicles.join(', '),
-    item.report
+    item.report,
+    `<button class="primary action-btn" data-action="view-incident" data-id="${item.id}">View</button>`
   ]);
   incidentsList.innerHTML = '';
-  incidentsList.appendChild(createTable(['Type', 'Location', 'Date', 'Officers', 'Vehicles', 'Report'], rows));
+  const table = createTable(['Type', 'Location', 'Date', 'Officers', 'Vehicles', 'Report', 'Actions'], rows);
+  incidentsList.appendChild(table);
+  attachActionButtons(incidentsList, '.action-btn[data-action="view-incident"]', async (id) => {
+    const incident = data.find(item => item.id === Number(id));
+    if (!incident) return;
+    showDetails('Incident Details', `Type: ${incident.type}\nLocation: ${incident.location}\nDate: ${incident.date}\nOfficers: ${incident.officers.join(', ')}\nVehicles: ${incident.vehicles.join(', ')}\nEquipment: ${incident.equipment.join(', ')}\nReport: ${incident.report}`);
+  });
 }
 
 function renderVehicles(data) {
@@ -284,30 +421,52 @@ function renderVehicles(data) {
     vehicle.capacity,
     vehicle.fuel,
     vehicle.insurance,
-    vehicle.status
+    vehicle.status,
+    `<button class="primary action-btn" data-action="view-vehicle" data-id="${vehicle.id}">View</button>`
   ]);
   vehiclesList.innerHTML = '';
-  vehiclesList.appendChild(createTable(['Plate', 'Model', 'Capacity', 'Fuel', 'Insurance', 'Status'], rows));
+  const table = createTable(['Plate', 'Model', 'Capacity', 'Fuel', 'Insurance', 'Status', 'Actions'], rows);
+  vehiclesList.appendChild(table);
+  attachActionButtons(vehiclesList, '.action-btn[data-action="view-vehicle"]', async (id) => {
+    const vehicle = data.find(item => item.id === Number(id));
+    if (!vehicle) return;
+    showDetails('Vehicle Details', `Plate: ${vehicle.plate}\nModel: ${vehicle.model}\nCapacity: ${vehicle.capacity}\nFuel: ${vehicle.fuel}\nInsurance: ${vehicle.insurance}\nStatus: ${vehicle.status}\nStation: ${vehicle.stationName || 'N/A'}`);
+  });
 }
 
 function renderEquipment(data) {
-  const rows = data.map(item => [item.name, item.stationName || 'N/A', item.status]);
+  const rows = data.map(item => [
+    item.name,
+    item.stationName || 'N/A',
+    item.status,
+    `<button class="primary action-btn" data-action="view-equipment" data-id="${item.id}">View</button>`
+  ]);
   equipmentList.innerHTML = '';
-  equipmentList.appendChild(createTable(['Equipment', 'Station', 'Status'], rows));
+  const table = createTable(['Equipment', 'Station', 'Status', 'Actions'], rows);
+  equipmentList.appendChild(table);
+  attachActionButtons(equipmentList, '.action-btn[data-action="view-equipment"]', async (id) => {
+    const equipment = data.find(item => item.id === Number(id));
+    if (!equipment) return;
+    showDetails('Equipment Details', `Name: ${equipment.name}\nStation: ${equipment.stationName || 'N/A'}\nStatus: ${equipment.status}`);
+  });
 }
 
 function renderShifts(data) {
-  const rows = data.map(shift => [shift.officer, shift.shift_type, shift.stationName, shift.date]);
+  const rows = data.map(shift => [
+    shift.officer,
+    shift.shift_type,
+    shift.stationName || 'N/A',
+    shift.date,
+    `<button class="primary action-btn" data-action="view-shift" data-id="${shift.id}">View</button>`
+  ]);
   shiftsList.innerHTML = '';
-  shiftsList.appendChild(createTable(['Officer', 'Shift', 'Station', 'Date'], rows));
-}
-
-function renderReports(data) {
-  reportCards.innerHTML = `
-    <div class="card"><h3>Total Stations</h3><p>${data.stationCount}</p></div>
-    <div class="card"><h3>Total Tasks</h3><p>${data.taskCount}</p></div>
-    <div class="card"><h3>Active Notifications</h3><p>${data.notificationCount}</p></div>
-  `;
+  const table = createTable(['Officer', 'Shift', 'Station', 'Date', 'Actions'], rows);
+  shiftsList.appendChild(table);
+  attachActionButtons(shiftsList, '.action-btn[data-action="view-shift"]', async (id) => {
+    const shift = data.find(item => item.id === Number(id));
+    if (!shift) return;
+    showDetails('Shift Details', `Officer: ${shift.officer}\nShift: ${shift.shift_type}\nStation: ${shift.stationName || 'N/A'}\nDate: ${shift.date}`);
+  });
 }
 
 async function loadAllData() {
@@ -326,6 +485,11 @@ function switchView(viewName) {
   views.forEach(view => view.classList.toggle('active', view.id === `${viewName}View`));
   navBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.view === viewName));
 }
+
+document.getElementById('newStationBtn').addEventListener('click', createStation);
+document.getElementById('newTaskBtn').addEventListener('click', createTask);
+document.getElementById('newIncidentBtn').addEventListener('click', createIncident);
+document.getElementById('newVehicleBtn').addEventListener('click', createVehicle);
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();

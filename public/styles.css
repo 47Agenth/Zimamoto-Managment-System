@@ -54,17 +54,41 @@ button {
 .login-brand,
 .login-card,
 .login-footer {
-  background: rgba(24,24,24,0.94);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 28px;
   padding: 32px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.12);
+  color: #111;
 }
 
 .login-brand {
   display: flex;
   gap: 24px;
   align-items: center;
+}
+
+.login-brand span,
+.login-brand p {
+  color: #555;
+}
+
+.login-card h2 {
+  margin: 0;
+  color: #111;
+}
+
+.login-card input,
+.login-card textarea,
+.login-card select {
+  background: #f7f7f7;
+  color: #111;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.primary {
+  background: linear-gradient(135deg, #0a4b95 0%, #0c2b5b 100%);
+  color: #fff;
 }
 
 .coat-of-arms {
