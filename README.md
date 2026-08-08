@@ -3,8 +3,8 @@
 A Tanzania Fire and Rescue management prototype with role-based dashboards, station operations, incident logging, vehicle management, and multilingual support.
 
 ## Features
-- Government-style login page inspired by e-Utendaji dashboards.
-- Simulated authentication using checknumber and password.
+- Login page branded for Zimamoto Mbeya Fire & Rescue.
+- Persistent SQLite storage for roles, stations, tasks, incidents, vehicles, equipment, shifts, notifications, and feedback.
 - Role-based dashboard content for Kamanda wa Mkoa, Kamanda wa Kituo, Mkuu wa Zamu, Askari Zimamoto, Fundi Magari, Afisa wa Vifaa.
 - Dashboard summary of stations, tasks, incidents, vehicles, equipment, shifts, and notifications.
 - Station CRUD operations and detailed station lists.
@@ -39,7 +39,7 @@ npm start
 - `VIFAA001` / `equipment123`
 
 ## Notes
-- This is a frontend/backend prototype using in-memory data.
-- For production, add persistent storage, authorization, and real authentication.
+- Backend data is persisted using SQLite in `data/zimamoto.db`.
+- For production, add authorization, password hashing, secure sessions, and file upload support.
 # Zimamoto-Managment-System
 # Zimamoto-Managment-System

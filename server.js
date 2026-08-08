@@ -1,82 +1,238 @@
+const fs = require('fs');
 const express = require('express');
 const path = require('path');
+const Database = require('better-sqlite3');
+
 const app = express();
 const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-let nextId = { station: 4, task: 8, incident: 4, vehicle: 4, notification: 4, feedback: 3 };
+const dataDir = path.join(__dirname, 'data');
+fs.mkdirSync(dataDir, { recursive: true });
+const dbPath = path.join(dataDir, 'zimamoto.db');
+const db = new Database(dbPath);
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
-const users = [
-  { id: 1, checknumber: 'KAMANDA001', password: 'admin123', name: 'Kamanda wa Mkoa', role: 'Kamanda wa Mkoa' },
-  { id: 2, checknumber: 'KAMANDA002', password: 'station123', name: 'Kamanda wa Kituo', role: 'Kamanda wa Kituo' },
-  { id: 3, checknumber: 'ZAMU001', password: 'shift123', name: 'Mkuu wa Zamu', role: 'Mkuu wa Zamu' },
-  { id: 4, checknumber: 'ASKARI001', password: 'askari123', name: 'Askari Zimamoto', role: 'Askari Zimamoto' },
-  { id: 5, checknumber: 'FUNDIA001', password: 'mechanic123', name: 'Fundi Magari', role: 'Fundi Magari' },
-  { id: 6, checknumber: 'VIFAA001', password: 'equipment123', name: 'Afisa wa Vifaa', role: 'Afisa wa Vifaa' },
-  { id: 7, checknumber: 'TEST001', password: 'test123', name: 'Test User', role: 'Viewer / Read-only' }
-];
+function initSchema() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS roles (
+      id INTEGER PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      label TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY,
+      checknumber TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      name TEXT NOT NULL,
+      role_code TEXT NOT NULL,
+      station_id INTEGER,
+      FOREIGN KEY(role_code) REFERENCES roles(code)
+    );
+    CREATE TABLE IF NOT EXISTS stations (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      location TEXT,
+      commander TEXT,
+      officers TEXT,
+      status TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      assigned_station_id INTEGER,
+      assigned_officers TEXT,
+      status TEXT NOT NULL,
+      deadline TEXT,
+      priority TEXT,
+      conditions TEXT,
+      history TEXT,
+      attachments TEXT,
+      feedback TEXT,
+      FOREIGN KEY(assigned_station_id) REFERENCES stations(id)
+    );
+    CREATE TABLE IF NOT EXISTS incidents (
+      id INTEGER PRIMARY KEY,
+      type TEXT NOT NULL,
+      location TEXT,
+      date TEXT,
+      officers TEXT,
+      vehicles TEXT,
+      equipment TEXT,
+      media TEXT,
+      report TEXT
+    );
+    CREATE TABLE IF NOT EXISTS vehicles (
+      id INTEGER PRIMARY KEY,
+      plate TEXT NOT NULL,
+      chassis TEXT,
+      engine TEXT,
+      model TEXT,
+      capacity TEXT,
+      fuel TEXT,
+      insurance TEXT,
+      status TEXT NOT NULL,
+      station_id INTEGER,
+      FOREIGN KEY(station_id) REFERENCES stations(id)
+    );
+    CREATE TABLE IF NOT EXISTS equipment (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL,
+      station_id INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      message TEXT,
+      type TEXT,
+      date TEXT,
+      active INTEGER DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS shifts (
+      id INTEGER PRIMARY KEY,
+      officer TEXT NOT NULL,
+      shift_type TEXT,
+      station_id INTEGER,
+      date TEXT,
+      FOREIGN KEY(station_id) REFERENCES stations(id)
+    );
+    CREATE TABLE IF NOT EXISTS feedback (
+      id INTEGER PRIMARY KEY,
+      source TEXT,
+      message TEXT,
+      created_at TEXT,
+      user TEXT
+    );
+  `);
+}
 
-const roles = [
-  { id: 1, code: 'admin', label: 'Kamanda wa Mkoa' },
-  { id: 2, code: 'station', label: 'Kamanda wa Kituo' },
-  { id: 3, code: 'shift', label: 'Mkuu wa Zamu' },
-  { id: 4, code: 'officer', label: 'Askari Zimamoto' },
-  { id: 5, code: 'mechanic', label: 'Fundi Magari' },
-  { id: 6, code: 'equipment', label: 'Afisa wa Vifaa' },
-  { id: 7, code: 'viewer', label: 'Viewer / Read-only' }
-];
+function parseJson(value) {
+  if (!value) return [];
+  try {
+    return JSON.parse(value);
+  } catch {
+    return [];
+  }
+}
 
-const stations = [
-  { id: 1, name: 'Kituo cha Jiji', location: 'Dar es Salaam', commander: 'Kamanda A', officers: ['Askari A', 'Askari B'], status: 'active' },
-  { id: 2, name: 'Kituo cha Mjini', location: 'Arusha', commander: 'Kamanda B', officers: ['Askari C', 'Askari D'], status: 'active' },
-  { id: 3, name: 'Kituo cha Kanda', location: 'Dodoma', commander: 'Kamanda C', officers: ['Askari E'], status: 'maintenance' }
-];
+function normalizeRow(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    officers: parseJson(row.officers),
+    assigned_officers: parseJson(row.assigned_officers),
+    history: parseJson(row.history),
+    attachments: parseJson(row.attachments),
+    feedback: parseJson(row.feedback),
+    vehicles: parseJson(row.vehicles),
+    equipment: parseJson(row.equipment),
+    media: parseJson(row.media)
+  };
+}
 
-const tasks = [
-  { id: 1, title: 'Kagua Tanki la Maji', assignedTo: ['Askari A', 'Askari C'], assignedStation: 'Kituo cha Jiji', status: 'in-progress', deadline: '2026-08-15', priority: 'High', conditions: 'Chapa moto kabla ya 18:00', history: ['Created by Kamanda wa Mkoa'], feedback: [] },
-  { id: 2, title: 'Lesson on Hose Repair', assignedTo: ['Askari B'], assignedStation: 'Kituo cha Mjini', status: 'pending', deadline: '2026-08-20', priority: 'Medium', conditions: 'Prepare report after training', history: ['Created by Kamanda wa Kituo'], feedback: [] },
-  { id: 3, title: 'Inspect Breathing Apparatus', assignedTo: ['Afisa wa Vifaa'], assignedStation: 'Kituo cha Kanda', status: 'assigned', deadline: '2026-08-14', priority: 'High', conditions: 'Record faults', history: ['Created by Kamanda wa Mkoa'], feedback: [] },
-  { id: 4, title: 'Refuel Chimney Truck', assignedTo: ['Fundi Magari'], assignedStation: 'Kituo cha Jiji', status: 'completed', deadline: '2026-08-12', priority: 'Low', conditions: 'Upload receipt', history: ['Created by Kamanda wa Kituo'], feedback: ['Great execution'] },
-  { id: 5, title: 'Prepare Incident Report', assignedTo: ['Askari D'], assignedStation: 'Kituo cha Mjini', status: 'delayed', deadline: '2026-08-10', priority: 'High', conditions: 'Submit before shift ends', history: ['Created by Mkuu wa Zamu'], feedback: [] },
-  { id: 6, title: 'Routine Vehicle Check', assignedTo: ['Fundi Magari'], assignedStation: 'Kituo cha Kanda', status: 'in-progress', deadline: '2026-08-18', priority: 'Medium', conditions: 'Check tyres and battery', history: ['Created by Kamanda wa Mkoa'], feedback: [] }
-];
+function seedData() {
+  const roleCount = db.prepare('SELECT COUNT(*) AS count FROM roles').get().count;
+  if (roleCount > 0) return;
 
-const incidents = [
-  { id: 1, type: 'Moto wa Nyumbani', location: 'Mtaa wa Kimara', date: '2026-08-01', officers: ['Askari A', 'Askari B'], vehicles: ['Truck 001'], equipment: ['Breathing Apparatus'], media: ['photo1.jpg'], report: 'Mafanikio, hakuna majeruhi.' },
-  { id: 2, type: 'Kutokea kwa Mafusho', location: 'Kizaazaa cha Gongo la Mboto', date: '2026-07-28', officers: ['Askari D'], vehicles: ['Truck 002'], equipment: ['Hose reel'], media: [], report: 'Inavyoendelea, utoaji wa maji kwa wakati.' }
-];
+  const insertRole = db.prepare('INSERT INTO roles (code, label) VALUES (?, ?)');
+  const insertUser = db.prepare('INSERT INTO users (checknumber, password, name, role_code, station_id) VALUES (?, ?, ?, ?, ?)');
+  const insertStation = db.prepare('INSERT INTO stations (name, location, commander, officers, status) VALUES (?, ?, ?, ?, ?)');
+  const insertTask = db.prepare('INSERT INTO tasks (title, assigned_station_id, assigned_officers, status, deadline, priority, conditions, history, attachments, feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const insertIncident = db.prepare('INSERT INTO incidents (type, location, date, officers, vehicles, equipment, media, report) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  const insertVehicle = db.prepare('INSERT INTO vehicles (plate, chassis, engine, model, capacity, fuel, insurance, status, station_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const insertEquipment = db.prepare('INSERT INTO equipment (name, status, station_id) VALUES (?, ?, ?)');
+  const insertNotification = db.prepare('INSERT INTO notifications (title, message, type, date, active) VALUES (?, ?, ?, ?, ?)');
+  const insertShift = db.prepare('INSERT INTO shifts (officer, shift_type, station_id, date) VALUES (?, ?, ?, ?)');
+  const insertFeedback = db.prepare('INSERT INTO feedback (source, message, created_at, user) VALUES (?, ?, ?, ?)');
 
-const vehicles = [
-  { id: 1, plate: 'T 123 ABC', chassis: 'CHS-001', engine: 'ENG-001', model: 'Rosenbauer', capacity: '5000L', fuel: 'Diesel', insurance: '2027-05-10', status: 'active' },
-  { id: 2, plate: 'T 234 DEF', chassis: 'CHS-002', engine: 'ENG-002', model: 'Magirus', capacity: '4000L', fuel: 'Diesel', insurance: '2026-11-01', status: 'maintenance' },
-  { id: 3, plate: 'T 345 GHI', chassis: 'CHS-003', engine: 'ENG-003', model: 'Scania', capacity: '7500L', fuel: 'Diesel', insurance: '2027-01-12', status: 'active' }
-];
+  const roles = [
+    ['admin', 'Kamanda wa Mkoa'],
+    ['station', 'Kamanda wa Kituo'],
+    ['shift', 'Mkuu wa Zamu'],
+    ['officer', 'Askari Zimamoto'],
+    ['mechanic', 'Fundi Magari'],
+    ['equipment', 'Afisa wa Vifaa'],
+    ['viewer', 'Viewer / Read-only']
+  ];
+  roles.forEach(r => insertRole.run(...r));
 
-const equipment = [
-  { id: 1, name: 'Hose reel', status: 'good', station: 'Kituo cha Mjini' },
-  { id: 2, name: 'Breathing Apparatus', status: 'damaged', station: 'Kituo cha Kanda' },
-  { id: 3, name: 'Fire Suit', status: 'good', station: 'Kituo cha Jiji' }
-];
+  insertStation.run('Kituo cha Jiji', 'Dar es Salaam', 'Kamanda A', JSON.stringify(['Askari A', 'Askari B']), 'active');
+  insertStation.run('Kituo cha Mjini', 'Arusha', 'Kamanda B', JSON.stringify(['Askari C', 'Askari D']), 'active');
+  insertStation.run('Kituo cha Kanda', 'Dodoma', 'Kamanda C', JSON.stringify(['Askari E']), 'maintenance');
 
-const notifications = [
-  { id: 1, title: 'Mkutano wa Kamanda', message: 'Mkutano wa wilaya saa 10:00 asubuhi.', date: '2026-08-10', type: 'alert' },
-  { id: 2, title: 'Mabadiliko ya Ratiba', message: 'Ratiba mpya ya zamu sasa imetumika.', date: '2026-08-09', type: 'info' }
-];
+  insertUser.run('KAMANDA001', 'admin123', 'Kamanda wa Mkoa', 'admin', null);
+  insertUser.run('KAMANDA002', 'station123', 'Kamanda wa Kituo', 'station', 1);
+  insertUser.run('ZAMU001', 'shift123', 'Mkuu wa Zamu', 'shift', null);
+  insertUser.run('ASKARI001', 'askari123', 'Askari Zimamoto', 'officer', 1);
+  insertUser.run('FUNDIA001', 'mechanic123', 'Fundi Magari', 'mechanic', 1);
+  insertUser.run('VIFAA001', 'equipment123', 'Afisa wa Vifaa', 'equipment', 2);
+  insertUser.run('TEST001', 'test123', 'Test User', 'viewer', null);
 
-const shifts = [
-  { id: 1, officer: 'Askari A', shift: 'Asubuhi', station: 'Kituo cha Jiji', date: '2026-08-11' },
-  { id: 2, officer: 'Askari B', shift: 'Mchana', station: 'Kituo cha Jiji', date: '2026-08-11' },
-  { id: 3, officer: 'Askari D', shift: 'Usiku', station: 'Kituo cha Mjini', date: '2026-08-11' }
-];
+  insertTask.run('Kagua Tanki la Maji', 1, JSON.stringify(['Askari A', 'Askari C']), 'in-progress', '2026-08-15', 'High', 'Chapa moto kabla ya 18:00', JSON.stringify(['Created by Kamanda wa Mkoa']), JSON.stringify([]), JSON.stringify([]));
+  insertTask.run('Lesson on Hose Repair', 2, JSON.stringify(['Askari B']), 'pending', '2026-08-20', 'Medium', 'Prepare report after training', JSON.stringify(['Created by Kamanda wa Kituo']), JSON.stringify([]), JSON.stringify([]));
+  insertTask.run('Inspect Breathing Apparatus', 3, JSON.stringify(['Afisa wa Vifaa']), 'assigned', '2026-08-14', 'High', 'Record faults', JSON.stringify(['Created by Kamanda wa Mkoa']), JSON.stringify([]), JSON.stringify([]));
+  insertTask.run('Refuel Chimney Truck', 1, JSON.stringify(['Fundi Magari']), 'completed', '2026-08-12', 'Low', 'Upload receipt', JSON.stringify(['Created by Kamanda wa Kituo']), JSON.stringify([]), JSON.stringify(['Great execution']));
+  insertTask.run('Prepare Incident Report', 2, JSON.stringify(['Askari D']), 'delayed', '2026-08-10', 'High', 'Submit before shift ends', JSON.stringify(['Created by Mkuu wa Zamu']), JSON.stringify([]), JSON.stringify([]));
+  insertTask.run('Routine Vehicle Check', 3, JSON.stringify(['Fundi Magari']), 'in-progress', '2026-08-18', 'Medium', 'Check tyres and battery', JSON.stringify(['Created by Kamanda wa Mkoa']), JSON.stringify([]), JSON.stringify([]));
+
+  insertIncident.run('Moto wa Nyumbani', 'Mtaa wa Kimara', '2026-08-01', JSON.stringify(['Askari A', 'Askari B']), JSON.stringify(['T 123 ABC']), JSON.stringify(['Breathing Apparatus']), JSON.stringify(['photo1.jpg']), 'Mafanikio, hakuna majeruhi.');
+  insertIncident.run('Kutokea kwa Mafusho', 'Kizaazaa cha Gongo la Mboto', '2026-07-28', JSON.stringify(['Askari D']), JSON.stringify(['T 234 DEF']), JSON.stringify(['Hose reel']), JSON.stringify([]), 'Inavyoendelea, utoaji wa maji kwa wakati.');
+
+  insertVehicle.run('T 123 ABC', 'CHS-001', 'ENG-001', 'Rosenbauer', '5000L', 'Diesel', '2027-05-10', 'active', 1);
+  insertVehicle.run('T 234 DEF', 'CHS-002', 'ENG-002', 'Magirus', '4000L', 'Diesel', '2026-11-01', 'maintenance', 2);
+  insertVehicle.run('T 345 GHI', 'CHS-003', 'ENG-003', 'Scania', '7500L', 'Diesel', '2027-01-12', 'active', 3);
+
+  insertEquipment.run('Hose reel', 'good', 2);
+  insertEquipment.run('Breathing Apparatus', 'damaged', 3);
+  insertEquipment.run('Fire Suit', 'good', 1);
+
+  insertNotification.run('Mkutano wa Kamanda', 'Mkutano wa wilaya saa 10:00 asubuhi.', 'alert', '2026-08-10', 1);
+  insertNotification.run('Mabadiliko ya Ratiba', 'Ratiba mpya ya zamu sasa imetumika.', 'info', '2026-08-09', 1);
+
+  insertShift.run('Askari A', 'Asubuhi', 1, '2026-08-11');
+  insertShift.run('Askari B', 'Mchana', 1, '2026-08-11');
+  insertShift.run('Askari D', 'Usiku', 2, '2026-08-11');
+
+  insertFeedback.run('Askari A', 'Nahitaji kuhakikisha gari iko tayari', '2026-08-08T08:00:00Z', 'Askari Zimamoto');
+}
+
+function getStationName(id) {
+  if (!id) return null;
+  const row = db.prepare('SELECT name FROM stations WHERE id = ?').get(id);
+  return row ? row.name : null;
+}
+
+function taskRowToObject(row) {
+  return {
+    ...normalizeRow(row),
+    assignedStation: getStationName(row.assigned_station_id)
+  };
+}
+
+function incidentRowToObject(row) {
+  return normalizeRow(row);
+}
+
+function vehicleRowToObject(row) {
+  return {
+    ...row,
+    stationName: getStationName(row.station_id)
+  };
+}
+
+initSchema();
+seedData();
 
 app.post('/api/auth/login', (req, res) => {
   const { checknumber, password } = req.body;
-  const user = users.find(u => u.checknumber === checknumber && u.password === password);
+  const user = db.prepare('SELECT u.id, u.checknumber, u.name, u.role_code AS roleCode, u.station_id, r.label AS role FROM users u JOIN roles r ON u.role_code = r.code WHERE u.checknumber = ? AND u.password = ?').get(checknumber, password);
   if (!user) {
     return res.status(401).json({ message: 'Invalid checknumber or password' });
   }
-  res.json({ id: user.id, name: user.name, role: user.role });
+  res.json(user);
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -84,33 +240,49 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 app.get('/api/users', (req, res) => {
-  res.json(users.map(({ id, name, role, checknumber }) => ({ id, name, role, checknumber })));
+  const rows = db.prepare('SELECT u.id, u.checknumber, u.name, r.label AS role, u.station_id FROM users u JOIN roles r ON u.role_code = r.code').all();
+  res.json(rows);
 });
 
 app.get('/api/roles', (req, res) => {
-  res.json(roles);
+  res.json(db.prepare('SELECT * FROM roles').all());
 });
 
 app.get('/api/dashboard', (req, res) => {
-  const completed = tasks.filter(t => t.status === 'completed').length;
-  const inProgress = tasks.filter(t => t.status === 'in-progress').length;
-  const pending = tasks.filter(t => t.status === 'pending' || t.status === 'assigned').length;
-  const delayed = tasks.filter(t => t.status === 'delayed').length;
-  const maintenance = vehicles.filter(v => v.status === 'maintenance').length;
-  const brokenEquipment = equipment.filter(e => e.status !== 'good').length;
+  const totalUsers = db.prepare('SELECT COUNT(*) AS count FROM users').get().count;
+  const stationsCount = db.prepare('SELECT COUNT(*) AS count FROM stations').get().count;
+  const tasksCount = db.prepare('SELECT COUNT(*) AS count FROM tasks').get().count;
+  const completed = db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE status = 'completed'").get().count;
+  const inProgress = db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE status = 'in-progress'").get().count;
+  const pending = db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE status IN ('pending', 'assigned')").get().count;
+  const delayed = db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE status = 'delayed'").get().count;
+  const vehiclesActive = db.prepare("SELECT COUNT(*) AS count FROM vehicles WHERE status = 'active'").get().count;
+  const maintenance = db.prepare("SELECT COUNT(*) AS count FROM vehicles WHERE status = 'maintenance'").get().count;
+  const brokenEquipment = db.prepare("SELECT COUNT(*) AS count FROM equipment WHERE status != 'good'").get().count;
+  const incidentReports = db.prepare('SELECT COUNT(*) AS count FROM incidents').get().count;
+  const notificationCount = db.prepare('SELECT COUNT(*) AS count FROM notifications WHERE active = 1').get().count;
+
+  const stations = db.prepare('SELECT * FROM stations').all().map(normalizeRow);
+  const tasks = db.prepare('SELECT t.*, s.name AS assignedStation FROM tasks t LEFT JOIN stations s ON t.assigned_station_id = s.id').all().map(taskRowToObject);
+  const incidents = db.prepare('SELECT * FROM incidents').all().map(incidentRowToObject);
+  const vehicles = db.prepare('SELECT * FROM vehicles').all().map(vehicleRowToObject);
+  const equipment = db.prepare('SELECT * FROM equipment').all();
+  const notifications = db.prepare('SELECT * FROM notifications WHERE active = 1 ORDER BY date DESC').all();
+  const shifts = db.prepare('SELECT s.*, st.name AS stationName FROM shifts s LEFT JOIN stations st ON s.station_id = st.id ORDER BY date ASC').all();
+
   res.json({
-    users: roles.length,
-    stations: stations.length,
-    tasks: tasks.length,
+    userCount: totalUsers,
+    stationCount: stationsCount,
+    taskCount: tasksCount,
     completed,
     inProgress,
     pending,
     delayed,
-    vehiclesActive: vehicles.filter(v => v.status === 'active').length,
+    vehiclesActive,
     maintenance,
     brokenEquipment,
-    incidentReports: incidents.length,
-    notifications: notifications.length,
+    incidentReports,
+    notificationCount,
     stations,
     tasks,
     incidents,
@@ -121,63 +293,102 @@ app.get('/api/dashboard', (req, res) => {
   });
 });
 
-app.get('/api/stations', (req, res) => res.json(stations));
-app.post('/api/stations', (req, res) => {
-  const station = { id: nextId.station++, status: 'active', ...req.body };
-  stations.push(station);
-  res.status(201).json(station);
+app.get('/api/stations', (req, res) => {
+  res.json(db.prepare('SELECT * FROM stations').all().map(normalizeRow));
 });
+
+app.post('/api/stations', (req, res) => {
+  const { name, location, commander, officers, status } = req.body;
+  const officersJson = JSON.stringify(Array.isArray(officers) ? officers : String(officers || '').split(',').map(o => o.trim()).filter(Boolean));
+  const result = db.prepare('INSERT INTO stations (name, location, commander, officers, status) VALUES (?, ?, ?, ?, ?)').run(name, location, commander, officersJson, status || 'active');
+  res.status(201).json(db.prepare('SELECT * FROM stations WHERE id = ?').get(result.lastInsertRowid));
+});
+
 app.put('/api/stations/:id', (req, res) => {
   const id = Number(req.params.id);
-  const station = stations.find(s => s.id === id);
-  if (!station) return res.status(404).json({ error: 'Station not found' });
-  Object.assign(station, req.body);
-  res.json(station);
+  const existing = db.prepare('SELECT * FROM stations WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Station not found' });
+  const { name, location, commander, officers, status } = req.body;
+  const officersJson = JSON.stringify(Array.isArray(officers) ? officers : String(officers || '').split(',').map(o => o.trim()).filter(Boolean));
+  db.prepare('UPDATE stations SET name = ?, location = ?, commander = ?, officers = ?, status = ? WHERE id = ?').run(name || existing.name, location || existing.location, commander || existing.commander, officersJson, status || existing.status, id);
+  res.json(db.prepare('SELECT * FROM stations WHERE id = ?').get(id));
 });
+
 app.delete('/api/stations/:id', (req, res) => {
   const id = Number(req.params.id);
-  const index = stations.findIndex(s => s.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Station not found' });
-  const removed = stations.splice(index, 1)[0];
+  const removed = db.prepare('SELECT * FROM stations WHERE id = ?').get(id);
+  if (!removed) return res.status(404).json({ error: 'Station not found' });
+  db.prepare('DELETE FROM stations WHERE id = ?').run(id);
   res.json(removed);
 });
 
-app.get('/api/tasks', (req, res) => res.json(tasks));
-app.post('/api/tasks', (req, res) => {
-  const task = { id: nextId.task++, history: ['Created'], feedback: [], ...req.body };
-  tasks.push(task);
-  res.status(201).json(task);
+app.get('/api/tasks', (req, res) => {
+  const rows = db.prepare('SELECT t.*, s.name AS assignedStation FROM tasks t LEFT JOIN stations s ON t.assigned_station_id = s.id').all();
+  res.json(rows.map(taskRowToObject));
 });
+
+app.post('/api/tasks', (req, res) => {
+  const { title, assigned_station_id, assigned_officers, status, deadline, priority, conditions } = req.body;
+  const officersJson = JSON.stringify(Array.isArray(assigned_officers) ? assigned_officers : String(assigned_officers || '').split(',').map(o => o.trim()).filter(Boolean));
+  const historyJson = JSON.stringify(['Created']);
+  const attachmentsJson = JSON.stringify([]);
+  const feedbackJson = JSON.stringify([]);
+  const result = db.prepare('INSERT INTO tasks (title, assigned_station_id, assigned_officers, status, deadline, priority, conditions, history, attachments, feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(title, assigned_station_id || null, officersJson, status || 'pending', deadline || null, priority || 'Normal', conditions || '', historyJson, attachmentsJson, feedbackJson);
+  res.status(201).json(taskRowToObject(db.prepare('SELECT t.*, s.name AS assignedStation FROM tasks t LEFT JOIN stations s ON t.assigned_station_id = s.id WHERE t.id = ?').get(result.lastInsertRowid)));
+});
+
 app.put('/api/tasks/:id', (req, res) => {
   const id = Number(req.params.id);
-  const task = tasks.find(t => t.id === id);
-  if (!task) return res.status(404).json({ error: 'Task not found' });
-  if (req.body.history) task.history.push(req.body.history);
-  Object.assign(task, req.body);
-  res.json(task);
+  const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Task not found' });
+  const { title, assigned_station_id, assigned_officers, status, deadline, priority, conditions, history } = req.body;
+  const officersJson = JSON.stringify(Array.isArray(assigned_officers) ? assigned_officers : String(assigned_officers || existing.assigned_officers || '').split(',').map(o => o.trim()).filter(Boolean));
+  const historyJson = JSON.stringify(Array.isArray(history) ? history : parseJson(existing.history).concat(history ? [history] : []));
+  db.prepare('UPDATE tasks SET title = ?, assigned_station_id = ?, assigned_officers = ?, status = ?, deadline = ?, priority = ?, conditions = ?, history = ? WHERE id = ?').run(title || existing.title, assigned_station_id || existing.assigned_station_id, officersJson, status || existing.status, deadline || existing.deadline, priority || existing.priority, conditions || existing.conditions, historyJson, id);
+  res.json(taskRowToObject(db.prepare('SELECT t.*, s.name AS assignedStation FROM tasks t LEFT JOIN stations s ON t.assigned_station_id = s.id WHERE t.id = ?').get(id)));
 });
 
-app.get('/api/incidents', (req, res) => res.json(incidents));
+app.get('/api/incidents', (req, res) => {
+  res.json(db.prepare('SELECT * FROM incidents').all().map(incidentRowToObject));
+});
+
 app.post('/api/incidents', (req, res) => {
-  const incident = { id: nextId.incident++, ...req.body };
-  incidents.push(incident);
-  res.status(201).json(incident);
+  const { type, location, date, officers, vehicles, equipment, media, report } = req.body;
+  const officersJson = JSON.stringify(Array.isArray(officers) ? officers : String(officers || '').split(',').map(o => o.trim()).filter(Boolean));
+  const vehiclesJson = JSON.stringify(Array.isArray(vehicles) ? vehicles : String(vehicles || '').split(',').map(v => v.trim()).filter(Boolean));
+  const equipmentJson = JSON.stringify(Array.isArray(equipment) ? equipment : String(equipment || '').split(',').map(e => e.trim()).filter(Boolean));
+  const mediaJson = JSON.stringify(Array.isArray(media) ? media : String(media || '').split(',').map(m => m.trim()).filter(Boolean));
+  const result = db.prepare('INSERT INTO incidents (type, location, date, officers, vehicles, equipment, media, report) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(type, location, date, officersJson, vehiclesJson, equipmentJson, mediaJson, report || '');
+  res.status(201).json(incidentRowToObject(db.prepare('SELECT * FROM incidents WHERE id = ?').get(result.lastInsertRowid)));
 });
 
-app.get('/api/vehicles', (req, res) => res.json(vehicles));
+app.get('/api/vehicles', (req, res) => {
+  res.json(db.prepare('SELECT * FROM vehicles').all().map(vehicleRowToObject));
+});
+
 app.post('/api/vehicles', (req, res) => {
-  const vehicle = { id: nextId.vehicle++, status: 'active', ...req.body };
-  vehicles.push(vehicle);
-  res.status(201).json(vehicle);
+  const { plate, chassis, engine, model, capacity, fuel, insurance, status, station_id } = req.body;
+  const result = db.prepare('INSERT INTO vehicles (plate, chassis, engine, model, capacity, fuel, insurance, status, station_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(plate, chassis, engine, model, capacity, fuel, insurance, status || 'active', station_id || null);
+  res.status(201).json(vehicleRowToObject(db.prepare('SELECT * FROM vehicles WHERE id = ?').get(result.lastInsertRowid)));
 });
 
-app.get('/api/equipment', (req, res) => res.json(equipment));
-app.get('/api/notifications', (req, res) => res.json(notifications));
-app.get('/api/shifts', (req, res) => res.json(shifts));
+app.get('/api/equipment', (req, res) => {
+  const rows = db.prepare('SELECT e.*, s.name AS stationName FROM equipment e LEFT JOIN stations s ON e.station_id = s.id').all();
+  res.json(rows);
+});
+
+app.get('/api/notifications', (req, res) => {
+  res.json(db.prepare('SELECT * FROM notifications WHERE active = 1 ORDER BY date DESC').all());
+});
+
+app.get('/api/shifts', (req, res) => {
+  res.json(db.prepare('SELECT s.*, st.name AS stationName FROM shifts s LEFT JOIN stations st ON s.station_id = st.id ORDER BY date ASC').all());
+});
+
 app.post('/api/feedback', (req, res) => {
-  const id = nextId.feedback++;
-  const newFeedback = { id, ...req.body };
-  res.status(201).json(newFeedback);
+  const { source, message, createdAt, user } = req.body;
+  const result = db.prepare('INSERT INTO feedback (source, message, created_at, user) VALUES (?, ?, ?, ?)').run(source, message, createdAt || new Date().toISOString(), user || 'Guest');
+  res.status(201).json({ id: result.lastInsertRowid, source, message, createdAt, user });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

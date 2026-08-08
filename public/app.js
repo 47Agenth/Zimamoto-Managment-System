@@ -200,10 +200,30 @@ function setAuthenticated(authenticated) {
   appShell.classList.toggle('hidden', !authenticated);
 }
 
+const viewPermissions = {
+  admin: ['dashboard', 'stations', 'tasks', 'incidents', 'vehicles', 'equipment', 'shifts', 'feedback', 'reports'],
+  station: ['dashboard', 'stations', 'tasks', 'incidents', 'vehicles', 'equipment', 'shifts', 'feedback', 'reports'],
+  shift: ['dashboard', 'tasks', 'incidents', 'shifts', 'feedback', 'reports'],
+  officer: ['dashboard', 'tasks', 'incidents', 'feedback', 'reports'],
+  mechanic: ['dashboard', 'vehicles', 'equipment', 'feedback', 'reports'],
+  equipment: ['dashboard', 'equipment', 'feedback', 'reports'],
+  viewer: ['dashboard', 'reports']
+};
+
+function updateNavForRole(role) {
+  const allowed = viewPermissions[role] || viewPermissions.viewer;
+  navBtns.forEach(btn => btn.classList.toggle('hidden', !allowed.includes(btn.dataset.view)));
+  const activeButton = navBtns.find(btn => btn.classList.contains('active') && !btn.classList.contains('hidden'));
+  if (!activeButton) {
+    const firstVisible = navBtns.find(btn => !btn.classList.contains('hidden'));
+    if (firstVisible) switchView(firstVisible.dataset.view);
+  }
+}
+
 function renderDashboard(data) {
   dashboardSummary.innerHTML = '';
-  dashboardSummary.appendChild(createSummaryCard('Stations', data.stations));
-  dashboardSummary.appendChild(createSummaryCard('Tasks', data.tasks));
+  dashboardSummary.appendChild(createSummaryCard('Stations', data.stationCount));
+  dashboardSummary.appendChild(createSummaryCard('Tasks', data.taskCount));
   dashboardSummary.appendChild(createSummaryCard('Completed', data.completed));
   dashboardSummary.appendChild(createSummaryCard('In Progress', data.inProgress));
   dashboardSummary.appendChild(createSummaryCard('Delayed', data.delayed));
@@ -235,7 +255,7 @@ function renderTasks(data) {
   const rows = data.map(task => [
     task.title,
     task.assignedStation,
-    task.assignedTo.join(', '),
+    task.assigned_officers.join(', '),
     task.status,
     task.deadline,
     task.priority
@@ -271,22 +291,22 @@ function renderVehicles(data) {
 }
 
 function renderEquipment(data) {
-  const rows = data.map(item => [item.name, item.station, item.status]);
+  const rows = data.map(item => [item.name, item.stationName || 'N/A', item.status]);
   equipmentList.innerHTML = '';
   equipmentList.appendChild(createTable(['Equipment', 'Station', 'Status'], rows));
 }
 
 function renderShifts(data) {
-  const rows = data.map(shift => [shift.officer, shift.shift, shift.station, shift.date]);
+  const rows = data.map(shift => [shift.officer, shift.shift_type, shift.stationName, shift.date]);
   shiftsList.innerHTML = '';
   shiftsList.appendChild(createTable(['Officer', 'Shift', 'Station', 'Date'], rows));
 }
 
 function renderReports(data) {
   reportCards.innerHTML = `
-    <div class="card"><h3>Total Stations</h3><p>${data.stations}</p></div>
-    <div class="card"><h3>Total Tasks</h3><p>${data.tasks}</p></div>
-    <div class="card"><h3>Active Notifications</h3><p>${data.notifications.length}</p></div>
+    <div class="card"><h3>Total Stations</h3><p>${data.stationCount}</p></div>
+    <div class="card"><h3>Total Tasks</h3><p>${data.taskCount}</p></div>
+    <div class="card"><h3>Active Notifications</h3><p>${data.notificationCount}</p></div>
   `;
 }
 
@@ -320,6 +340,7 @@ loginForm.addEventListener('submit', async (event) => {
     if (keepLoggedInCheckbox.checked) {
       localStorage.setItem('zimamotoUser', JSON.stringify(user));
     }
+    updateNavForRole(user.roleCode || user.role?.toLowerCase());
     setAuthenticated(true);
     await loadAllData();
   } catch (error) {
@@ -359,6 +380,7 @@ signOutBtn.addEventListener('click', async () => {
     console.warn('Logout failed', error);
   }
   localStorage.removeItem('zimamotoUser');
+  navBtns.forEach(btn => btn.classList.remove('hidden'));
   setAuthenticated(false);
 });
 
@@ -376,6 +398,7 @@ function initialize() {
   if (storedUser) {
     currentUser = JSON.parse(storedUser);
     currentUserLabel.textContent = `${currentUser.name} (${currentUser.role})`;
+    updateNavForRole(currentUser.roleCode || currentUser.role?.toLowerCase());
     setAuthenticated(true);
     loadAllData();
   }
