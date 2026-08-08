@@ -1,0 +1,12 @@
+{
+  "name": "zimamoto-management-system",
+  "version": "1.0.0",
+  "description": "A Tanzania Fire Station management system prototype with role-based dashboards and incident/task management.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.4"
+  }
+}
