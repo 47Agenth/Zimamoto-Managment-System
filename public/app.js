@@ -30,6 +30,7 @@ const reportCards = document.getElementById('reportCards');
 const feedbackSource = document.getElementById('feedbackSource');
 const feedbackMessage = document.getElementById('feedbackMessage');
 const feedbackConfirmation = document.getElementById('feedbackConfirmation');
+const submitFeedbackBtn = document.getElementById('submitFeedbackBtn');
 const views = Array.from(document.querySelectorAll('.view'));
 const navBtns = Array.from(document.querySelectorAll('.nav-btn'));
 
@@ -179,6 +180,21 @@ async function fetchDashboardData() {
   return response.json();
 }
 
+async function sendFeedback(feedback) {
+  const response = await fetch('/api/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feedback)
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to submit feedback');
+  }
+
+  return response.json();
+}
+
 function setAuthenticated(authenticated) {
   loginView.classList.toggle('hidden', authenticated);
   appShell.classList.toggle('hidden', !authenticated);
@@ -311,7 +327,37 @@ loginForm.addEventListener('submit', async (event) => {
   }
 });
 
-signOutBtn.addEventListener('click', () => {
+submitFeedbackBtn.addEventListener('click', async () => {
+  feedbackConfirmation.textContent = '';
+  const source = feedbackSource.value.trim();
+  const message = feedbackMessage.value.trim();
+
+  if (!source || !message) {
+    feedbackConfirmation.textContent = 'Please provide both source and message.';
+    return;
+  }
+
+  try {
+    await sendFeedback({
+      source,
+      message,
+      createdAt: new Date().toISOString(),
+      user: currentUser ? currentUser.name : 'Guest'
+    });
+    feedbackConfirmation.textContent = 'Feedback submitted successfully.';
+    feedbackSource.value = '';
+    feedbackMessage.value = '';
+  } catch (error) {
+    feedbackConfirmation.textContent = error.message;
+  }
+});
+
+signOutBtn.addEventListener('click', async () => {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch (error) {
+    console.warn('Logout failed', error);
+  }
   localStorage.removeItem('zimamotoUser');
   setAuthenticated(false);
 });

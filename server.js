@@ -14,7 +14,7 @@ const users = [
   { id: 4, checknumber: 'ASKARI001', password: 'askari123', name: 'Askari Zimamoto', role: 'Askari Zimamoto' },
   { id: 5, checknumber: 'FUNDIA001', password: 'mechanic123', name: 'Fundi Magari', role: 'Fundi Magari' },
   { id: 6, checknumber: 'VIFAA001', password: 'equipment123', name: 'Afisa wa Vifaa', role: 'Afisa wa Vifaa' },
-  { id: 7, checknumber: 'TESTUSER001', password: 'test123', name: 'Test User', role: 'Simulation User' }
+  { id: 7, checknumber: 'TEST001', password: 'test123', name: 'Test User', role: 'Viewer / Read-only' }
 ];
 
 const roles = [
@@ -77,6 +77,18 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(401).json({ message: 'Invalid checknumber or password' });
   }
   res.json({ id: user.id, name: user.name, role: user.role });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.json({ message: 'Logged out' });
+});
+
+app.get('/api/users', (req, res) => {
+  res.json(users.map(({ id, name, role, checknumber }) => ({ id, name, role, checknumber })));
+});
+
+app.get('/api/roles', (req, res) => {
+  res.json(roles);
 });
 
 app.get('/api/dashboard', (req, res) => {

@@ -37,7 +37,6 @@ npm start
 - `ASKARI001` / `askari123`
 - `FUNDIA001` / `mechanic123`
 - `VIFAA001` / `equipment123`
-- `TESTUSER001` / `test123` (Test user)
 
 ## Notes
 - This is a frontend/backend prototype using in-memory data.
