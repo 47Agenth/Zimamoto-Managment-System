@@ -1,0 +1,39 @@
+0 verbose cli /usr/local/bin/node /usr/local/bin/npm
+1 info using npm@11.13.0
+2 info using node@v24.17.0
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/maxpro/Desktop/Zimamoto Managment System/.npmrc
+5 silly config load:file:/Users/maxpro/.npmrc
+6 silly config load:file:/usr/local/etc/npmrc
+7 verbose title npm install better-sqlite3
+8 verbose argv "install" "better-sqlite3" "--cache" "./npm-cache" "--no-audit" "--no-fund"
+9 verbose logfile logs-max:10 dir:/Users/maxpro/Desktop/Zimamoto Managment System/npm-cache/_logs/2026-08-08T16_07_29_113Z-
+10 verbose logfile /Users/maxpro/Desktop/Zimamoto Managment System/npm-cache/_logs/2026-08-08T16_07_29_113Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:2348810240 maxSize:587202560 maxEntrySize:293601280
+13 silly idealTree buildDeps
+14 silly fetch manifest better-sqlite3@*
+15 silly packumentCache full:https://registry.npmjs.org/better-sqlite3 cache-miss
+16 http fetch GET 200 https://registry.npmjs.org/better-sqlite3 780ms (cache miss)
+17 silly packumentCache full:https://registry.npmjs.org/better-sqlite3 set size:undefined disposed:false
+18 silly placeDep ROOT better-sqlite3@13.0.3 OK for: zimamoto-management-system@1.0.0 want: *
+19 silly fetch manifest node-addon-api@^8.0.0
+20 silly packumentCache full:https://registry.npmjs.org/node-addon-api cache-miss
+21 http fetch GET 200 https://registry.npmjs.org/node-addon-api 363ms (cache miss)
+22 silly packumentCache full:https://registry.npmjs.org/node-addon-api set size:undefined disposed:false
+23 silly placeDep ROOT node-addon-api@8.9.1 OK for: better-sqlite3@13.0.3 want: ^8.0.0
+24 silly reify moves {}
+25 http cache node-addon-api@https://registry.npmjs.org/node-addon-api/-/node-addon-api-8.9.1.tgz 0ms (cache hit)
+26 http cache better-sqlite3@https://registry.npmjs.org/better-sqlite3/-/better-sqlite3-13.0.3.tgz 0ms (cache hit)
+27 silly tarball no local data for node-addon-api@https://registry.npmjs.org/node-addon-api/-/node-addon-api-8.9.1.tgz. Extracting by manifest.
+28 silly tarball no local data for better-sqlite3@https://registry.npmjs.org/better-sqlite3/-/better-sqlite3-13.0.3.tgz. Extracting by manifest.
+29 http fetch GET 200 https://registry.npmjs.org/node-addon-api/-/node-addon-api-8.9.1.tgz 132ms (cache miss)
+30 http fetch GET 200 https://registry.npmjs.org/better-sqlite3/-/better-sqlite3-13.0.3.tgz 10036ms (cache miss)
+31 silly ADD node_modules/node-addon-api
+32 silly ADD node_modules/better-sqlite3
+33 verbose cwd /Users/maxpro/Desktop/Zimamoto Managment System
+34 verbose os Darwin 22.6.0
+35 verbose node v24.17.0
+36 verbose npm  v11.13.0
+37 verbose exit 0
+38 info ok
