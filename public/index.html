@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zimamoto Mbeya Fire & Rescue</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="loginView" class="login-view">
+    <div class="login-container">
+      <div class="login-brand">
+        <div class="coat-of-arms"></div>
+        <div>
+          <span>THE UNITED REPUBLIC OF TANZANIA</span>
+          <h1>ZIMAMOTO MBEYA FIRE AND RESCUE</h1>
+          <p>Fire & Rescue Management System</p>
+        </div>
+      </div>
+      <div class="login-card">
+        <h2>Sign In to Zimamoto Mbeya</h2>
+        <form id="loginForm">
+          <label for="checknumberInput">User name</label>
+          <input id="checknumberInput" name="User name" type="text" autocomplete="username" required>
+          <label for="passwordInput">Password</label>
+          <input id="passwordInput" name="password" type="password" autocomplete="current-password" required>
+          <div class="login-actions">
+            <label class="checkbox-label"><input id="keepLoggedIn" type="checkbox"> Keep me logged in</label>
+            <a href="#" class="secondary-link">Forgot password?</a>
+          </div>
+          <button type="submit" class="primary">Sign In</button>
+          <p class="register-text">Dont have an account? <a href="#" class="secondary-link">Register Here</a></p>
+          <div id="loginError" class="notification"></div>
+        </form>
+      </div>
+      <footer class="login-footer">
+        <span>© 2026 Zimamoto Mbeya</span>
+      </footer>
+    </div>
+  </div>
+
+  <div id="appShell" class="app-shell hidden">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>Zimamoto Mbeya Management</h1>
+          <p>Fire Station Operations & Incident Control</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="user-summary">
+          <span id="currentUserLabel">Guest</span>
+          <button id="signOutBtn" class="secondary">Sign Out</button>
+        </div>
+        <div class="language-select">
+          <select id="languageSelect">
+            <option value="sw">Kiswahili</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <h2 id="menuTitle">Menu</h2>
+          <nav>
+            <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+            <button class="nav-btn" data-view="stations">Stations</button>
+            <button class="nav-btn" data-view="tasks">Tasks</button>
+            <button class="nav-btn" data-view="incidents">Incidents</button>
+            <button class="nav-btn" data-view="vehicles">Vehicles</button>
+            <button class="nav-btn" data-view="equipment">Equipment</button>
+            <button class="nav-btn" data-view="shifts">Shifts</button>
+            <button class="nav-btn" data-view="feedback">Feedback</button>
+            <button class="nav-btn" data-view="reports">Reports</button>
+          </nav>
+        </div>
+      </aside>
+
+      <section class="content">
+        <section id="dashboardView" class="view active">
+          <div class="view-header">
+            <div>
+              <h2 id="dashboardTitle">Dashboard</h2>
+              <p class="view-description">Overview of stations, tasks, vehicles, incidents and notifications.</p>
+            </div>
+          </div>
+          <div class="summary-grid" id="dashboardSummary"></div>
+          <div class="cards-grid" id="dashboardCards"></div>
+        </section>
+
+        <section id="stationsView" class="view">
+          <div class="view-header">
+            <h2 id="stationsTitle">Station Management</h2>
+            <button class="primary" id="newStationBtn">Add Station</button>
+          </div>
+          <div id="stationsList" class="table-container"></div>
+        </section>
+
+        <section id="tasksView" class="view">
+          <div class="view-header">
+            <h2 id="tasksTitle">Task Management</h2>
+            <button class="primary" id="newTaskBtn">Create Task</button>
+          </div>
+          <div id="tasksList" class="table-container"></div>
+        </section>
+
+        <section id="incidentsView" class="view">
+          <div class="view-header">
+            <h2 id="incidentsTitle">Incident Management</h2>
+            <button class="primary" id="newIncidentBtn">Record Incident</button>
+          </div>
+          <div id="incidentsList" class="table-container"></div>
+        </section>
+
+        <section id="vehiclesView" class="view">
+          <div class="view-header">
+            <h2 id="vehiclesTitle">Vehicle Management</h2>
+            <button class="primary" id="newVehicleBtn">Register Vehicle</button>
+          </div>
+          <div id="vehiclesList" class="table-container"></div>
+        </section>
+
+        <section id="equipmentView" class="view">
+          <h2 id="equipmentTitle">Equipment & Inventory</h2>
+          <div id="equipmentList" class="table-container"></div>
+        </section>
+
+        <section id="shiftsView" class="view">
+          <h2 id="shiftsTitle">Shift Management</h2>
+          <div id="shiftsList" class="table-container"></div>
+        </section>
+
+        <section id="feedbackView" class="view">
+          <h2 id="feedbackTitle">Feedback</h2>
+          <div class="feedback-form">
+            <label>Officer / Station</label>
+            <input id="feedbackSource" type="text" placeholder="Name or station">
+            <label>Message</label>
+            <textarea id="feedbackMessage" rows="4"></textarea>
+            <button class="primary" id="submitFeedbackBtn">Submit Feedback</button>
+            <div id="feedbackConfirmation" class="notification"></div>
+          </div>
+        </section>
+
+        <section id="reportsView" class="view">
+          <h2 id="reportsTitle">Reports & Analytics</h2>
+          <div class="report-cards" id="reportCards"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <template id="tableTemplate">
+    <table>
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
